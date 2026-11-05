@@ -3,9 +3,7 @@
 Reverse-engineering of the **TP-Link Archer TX10UB Nano** USB Wi-Fi adapter firmware
 (Realtek **RTL8851BU**, Linux driver `rtw89_8851bu`).
 
-**Goal:** understand the adapter's on-chip firmware, then add a self-wake timer so a ThinkPad
-X220 can wake itself from suspend about 30 minutes after it sleeps. The laptop's RTC cannot wake
-it from S3, but a USB device on the EHCI port can issue a USB remote-wakeup.
+Leaving source here, and putting my changes on a separate branch.
 
 ## Status
 
