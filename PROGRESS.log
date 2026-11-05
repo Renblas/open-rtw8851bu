@@ -1,0 +1,60 @@
+# open-rtw8851bu — progress log.  Watch with:  tail -f ~/Programming/open-rtw8851bu/PROGRESS.log
+# ------------------------------------------------------------------------------------------------
+2026-10-26  Extracted firmware sections from rtw8851b_fw.bin (code/data/WoWLAN/LOGFMT) -> firmware/
+2026-10-26  Confirmed MCU = MIPS32 little-endian (rizin rz-asm; entry is a C runtime).
+2026-10-26  Read secure-boot fuse via a patched rtw89 module: efuse 0x5EC = 0xFF 0xFF -> OFF.
+            The chip runs UNSIGNED firmware. Modification path is open.
+2026-10-26  Found the timer/wake subsystem by name in LOGFMT: Gtimer, PStimer (TSF), WDT_timer,
+            "Deauth wake up!", "Wowlan rekey".
+2026-10-26  Installed Ghidra 12.1.4 + JDK 21 + uv + GhidraMCP 2.0 (headless). Registered the
+            user-scope `ghidra` MCP server (28 tools).
+2026-10-27  Fixed a dot-path project bug (Ghidra rejects paths under ~/.local). Re-registered.
+2026-10-27  Ghidra MCP verified working: get_program_info OK; decompiled FUN_00024714 (a real
+            MIPS32 event handler that reads reg 0x8104 and dispatches via a pointer table).
+            Only 3 functions auto-found -> position-independent calls block discovery.
+2026-10-27  Moved all work into ~/Programming/open-rtw8851bu/ and pointed the MCP server here.
+# ------------------------------------------------------------------------------------------------
+2026-10-27  Decompiled + named 3 MIPS32 interrupt dispatchers; named the firmware's core
+            primitives (read/write_mac_reg, fw_send_msg, log_err, msg_commit).
+2026-10-27  CRACKED THE ISA: firmware is mixed MIPS32 (ISRs/startup) + MIPS16e (bulk),
+            reached via jalx. Code's true base = 0x08970000. Rebuild at that base next.
+2026-10-27  Rebuilding Ghidra project at true base 0x08970000 (analyzeHeadless, ~minutes)
+            to resolve jalx calls and decode the MIPS16e bulk. Watch ghidra-view/rebuild.log
+2026-10-27  Base-correct rebuild (wowlan-based @ 0x08970000): 14 functions (was 3). MIPS16e
+            direct-call targets decode (FUN_08981794 = a watchdog/reset path).
+2026-10-27  NEXT: prologue-seeding Ghidra post-script to discover the pointer-table-only
+            MIPS16e bulk, then locate Gtimer/PStimer + the wake path.
+2026-10-27  JACKPOT: data section holds a 419-entry function-pointer table (396 MIPS16e),
+            resolving at the TRUE base 0xb8970000 (corrected from 0x08970000). Seeding all 419
+            functions via a Ghidra post-script + re-analysis (project wowlan-full).
+2026-10-27  FULL MAP: Java seeder created 370 functions from the pointer table; call-following
+            cascaded to 973 FUNCTIONS TOTAL (was 14). Correct base 0xb8970000, data mapped.
+            Project: ghidra-projects/wowlan-full. Now hunting the timer/wake code.
+2026-10-27  Mapped modules via source-filename asserts in the data section. Located the TIMER
+            module (5 funcs @ b8978xxx) and the RPWM/CPWM host<->chip SLEEP/WAKE handshake
+            (rpwm_cpwm_handler @ b89a535c). Named the power primitives (read_rpwm, ack_cpwm,
+            set_power_mode, timer_read). This is the core path for the self-wake.
+2026-10-27  Full decompile of all 973 functions running -> decompiled/wowlan_full.c (+index.txt).
+2026-10-27  FULL DECOMPILE COMPLETE: 973/973 functions, 0 failures -> decompiled/wowlan_full.c
+            (40,489 lines) + index.txt. Ready for the injection phase.
+2026-10-27  Injection phase step 1: tracing sleep-entry -> host-wake -> timer-arm in the full source.
+2026-10-27  Decoded the TIMER-ARM API (FUN_b8978c08/df8/fec): arm_timer(idx,mode,periodic,
+            duration28, callback, arg) -> calls callback on fire. This is the injection hook.
+            NEXT: find the host-wake primitive, then design the patch.
+2026-10-27  #1 DONE: diagnosed the 1005 'unrecovered jumptables' as mislabeled MIPS16e returns
+            (return via temp reg, not jr ra). FixReturns.java set RETURN on 705 jr insns ->
+            UNRECOVERED_JUMPTABLE 1005->0, real switches 504->2. Re-decompiled clean (38,519 lines).
+            The decompile is now correct/readable. Remaining indirect CALLS go through the ROM-
+            resident 0xb8e09xxx primitive table (named behaviorally, not a jumptable problem).
+2026-10-27  Wake trace + 2 switches: FUN_b89ad244 is the CPU interrupt/exception DISPATCHER
+            (saves EPC, dispatches via ROM handler table @0xb8e09000). The 2 remaining 'switches'
+            (b89ad290,b89ad48c) ARE that ISR dispatch -> not statically resolvable (same ROM wall
+            as the primitive table). Driver: wake reason reported via AOAC report C2H. Wake trigger
+            (USB remote-wakeup primitive) still to find by behavioral inference. [usage limit hit]
+2026-11-05  'Decompile the whole thing': running the full pipeline on the NORMAL_CE image
+            (seed+fix-returns+decompile) -> decompiled/normal_full.c (project normal-full).
+2026-11-05  WHOLE FIRMWARE DECOMPILED. NORMAL_CE: 444 seeds -> 1121 functions, 793 returns fixed,
+            1121/1121 decompiled, 0 failures, 0 UNRECOVERED_JUMPTABLE -> decompiled/normal_full.c
+            (43,949 lines, project normal-full). Both images done: WoWLAN 973 + NORMAL_CE 1121 =
+            2094 functions. NORMAL adds BTCoex/HCI/MAC-TX/GPIO/EFUSE/H2C-C2H/MCC/P2P/Scan/TWT/RF.
+            cv1 variants are alternate silicon cuts (near-identical, not decompiled). LOGFMT = strings.

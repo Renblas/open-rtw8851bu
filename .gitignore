@@ -1,0 +1,14 @@
+# Regenerable Ghidra projects (rebuild with tools/rebuild-*.sh) — large binary artifacts.
+ghidra-projects/
+
+# Third-party, re-downloadable (GhidraMCP 2.0 extension + wheel; see README).
+third_party/
+
+# Transient logs and generated files.
+*.log
+ghidra-view/
+tools/fn_targets.txt
+__pycache__/
+*.pyc
+*.lock
+!PROGRESS.log
